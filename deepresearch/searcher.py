@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from urllib.parse import urlparse
+
 import serpapi
 from deepresearch.config import Config
 from deepresearch.state import AgentState
@@ -35,19 +37,20 @@ ENGINE_PARAMS = {
     },
 }
 
+# Cap results per engine query (google_news returns 100+ uncapped)
+MAX_RESULTS_PER_QUERY = 10
+
 
 def _extract_sources(results: dict, engine: str, query: str) -> list[dict]:
     """Extract normalized sources from SerpApi response based on engine type."""
     sources = []
 
     if engine == "google_trends":
-        # Trends returns interest-over-time data, not links
         interest = results.get("interest_over_time", {})
         timeline = interest.get("timeline_data", [])
         if timeline:
-            # Summarize the trend data as a synthetic source
             values = []
-            for point in timeline[-6:]:  # last 6 data points
+            for point in timeline[-6:]:
                 for v in point.get("values", []):
                     values.append(f"{point.get('date', '?')}: {v.get('value', '?')}")
             sources.append({
@@ -65,11 +68,23 @@ def _extract_sources(results: dict, engine: str, query: str) -> list[dict]:
     organic = results.get("organic_results", [])
     if engine == "google_news":
         organic = results.get("news_results", organic)
+
+    # Cap results to avoid flooding
+    organic = organic[:MAX_RESULTS_PER_QUERY]
+
     for r in organic:
+        title = r.get("title", "")
+        snippet = r.get("snippet", r.get("publication_info", {}).get("summary", ""))
+        url = r.get("link", r.get("result_id", ""))
+
+        # Skip sources with no useful content
+        if not title or not url:
+            continue
+
         sources.append({
-            "title": r.get("title", ""),
-            "url": r.get("link", r.get("result_id", "")),
-            "snippet": r.get("snippet", r.get("publication_info", {}).get("summary", "")),
+            "title": title,
+            "url": url,
+            "snippet": snippet or title,
             "engine": engine,
             "query": query,
             "relevance_score": 0.0,
@@ -117,7 +132,6 @@ def _extract_sources(results: dict, engine: str, query: str) -> list[dict]:
         for r in organic:
             cited = r.get("inline_links", {}).get("cited_by", {})
             if cited:
-                # Enrich the snippet with citation count
                 for s in sources:
                     if s["url"] == r.get("link", ""):
                         cite_count = cited.get("total", 0)
@@ -139,6 +153,36 @@ def _extract_sources(results: dict, engine: str, query: str) -> list[dict]:
     return sources
 
 
+def _dedupe_and_filter(sources: list[dict]) -> list[dict]:
+    """Remove duplicates, empty content, and cap per-domain noise."""
+    seen_urls = set()
+    domain_counts: dict[str, int] = {}
+    filtered = []
+
+    for s in sources:
+        url = s.get("url", "")
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+
+        # Skip very short snippets
+        if len(s.get("snippet", "")) < 20:
+            continue
+
+        # Cap 3 results per domain to reduce noise
+        try:
+            domain = urlparse(url).netloc
+        except Exception:
+            domain = url
+        domain_counts[domain] = domain_counts.get(domain, 0) + 1
+        if domain_counts[domain] > 3:
+            continue
+
+        filtered.append(s)
+
+    return filtered
+
+
 def search_node(state: AgentState) -> dict:
     """Execute all pending sub-queries via SerpApi."""
     config = Config()
@@ -155,13 +199,7 @@ def search_node(state: AgentState) -> dict:
 
         for engine in sq["engines"]:
             base_params = ENGINE_PARAMS.get(engine, {"engine": "google"})
-            params = {**base_params}
-
-            # Set the query parameter (different key for trends)
-            if engine == "google_trends":
-                params["q"] = sq["question"]
-            else:
-                params["q"] = sq["question"]
+            params = {**base_params, "q": sq["question"]}
 
             try:
                 results = client.search(params)
@@ -178,13 +216,17 @@ def search_node(state: AgentState) -> dict:
         updated_sq = {**sq, "status": "searched"}
         updated_sub_queries.append(updated_sq)
 
+    # Dedupe and filter before evaluation
+    raw_count = len(new_sources)
+    filtered = _dedupe_and_filter(new_sources)
+
     return {
-        "sources": new_sources,
+        "sources": filtered,
         "sub_queries": updated_sub_queries,
         "search_log": search_log,
         "status": "evaluating",
         "progress_log": [
-            f"🔍 Search complete: {len(new_sources)} new sources found across "
+            f"🔍 Search complete: {raw_count} raw → {len(filtered)} quality sources across "
             f"{len(search_log)} engine queries"
         ],
     }

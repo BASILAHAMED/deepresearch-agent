@@ -156,20 +156,25 @@ with col2:
 
 if run_button and question:
     import os
-    os.environ["SERPAPI_KEY"] = st.session_state.get("serpapi_key", "")
+    # Use sidebar values (which default from .env via load_dotenv)
+    _serpapi_key = serpapi_key or os.getenv("SERPAPI_KEY", "")
+    _llm_key = llm_key or (os.getenv("ANTHROPIC_API_KEY", "") if llm_provider == "anthropic" else os.getenv("OPENAI_API_KEY", ""))
+
+    os.environ["SERPAPI_KEY"] = _serpapi_key
     os.environ["LLM_PROVIDER"] = llm_provider
     if llm_provider == "openai":
-        os.environ["OPENAI_API_KEY"] = st.session_state.get("openai_key", "")
+        os.environ["OPENAI_API_KEY"] = _llm_key
     else:
-        os.environ["ANTHROPIC_API_KEY"] = st.session_state.get("anthropic_key", "")
+        os.environ["ANTHROPIC_API_KEY"] = _llm_key
 
     config = Config()
-    config.serpapi_key = st.session_state.get("serpapi_key", "")
+    config.serpapi_key = _serpapi_key
     config.llm_model = llm_model
+    config.llm_provider = llm_provider
     if llm_provider == "openai":
-        config.openai_api_key = st.session_state.get("openai_key", "")
+        config.openai_api_key = _llm_key
     else:
-        config.anthropic_api_key = st.session_state.get("anthropic_key", "")
+        config.anthropic_api_key = _llm_key
 
     errors = config.validate()
     if errors:
