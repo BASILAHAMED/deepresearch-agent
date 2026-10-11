@@ -14,14 +14,26 @@ def get_llm_client(config: Config):
         client = anthropic.Anthropic(api_key=config.anthropic_api_key)
 
         def invoke(system: str, user: str, temperature: float = 0.3) -> str:
-            resp = client.messages.create(
+            kwargs = dict(
                 model=config.llm_model,
                 max_tokens=4096,
-                temperature=temperature,
                 system=system,
                 messages=[{"role": "user", "content": user}],
             )
-            return resp.content[0].text
+            # temperature support varies by SDK version
+            try:
+                resp = client.messages.create(**kwargs, temperature=temperature)
+            except TypeError:
+                resp = client.messages.create(**kwargs)
+            # Extract text from response, skipping ThinkingBlocks
+            for block in resp.content:
+                if block.type == "text":
+                    return block.text
+            # fallback: return first block with text
+            for block in resp.content:
+                if hasattr(block, 'text'):
+                    return block.text
+            return str(resp.content[0])
 
         return invoke, "anthropic"
     else:

@@ -77,8 +77,12 @@ def evaluate_node(state: AgentState) -> dict:
     result = invoke(EVAL_SYSTEM, user_msg, temperature=0.2)
     parsed = parse_json_response(result)
 
+    # Handle case where LLM returns a list instead of dict
+    if isinstance(parsed, list):
+        parsed = {"source_assessments": parsed, "coverage_gaps": [], "quality_score": 0.5, "should_continue": True}
+
     # Apply assessments back to sources
-    assessment_map = {a["url"]: a for a in parsed.get("source_assessments", [])}
+    assessment_map = {a["url"]: a for a in parsed.get("source_assessments", []) if isinstance(a, dict) and "url" in a}
     updated_sources = []
     for s in sources:
         assessment = assessment_map.get(s["url"], {})

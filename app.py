@@ -82,7 +82,7 @@ with st.sidebar:
             st.session_state["anthropic_key"] = llm_key
         llm_model = st.selectbox(
             "Model",
-            ["claude-sonnet-4-20250514", "claude-haiku-4-20250414"],
+            ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-sonnet-4-6"],
         )
 
     max_iterations = st.slider(
