@@ -6,8 +6,13 @@ Autonomous multi-step research agent powered by SerpApi + LLM reasoning.
 import streamlit as st
 import time
 import json
+import os
+from dotenv import load_dotenv
 from deepresearch.config import Config
 from deepresearch.agent import run_research
+
+# Load .env file automatically
+load_dotenv()
 
 
 # ── Page config ─────────────────────────────────────────────────────────────
@@ -51,21 +56,22 @@ with st.sidebar:
 
     serpapi_key = st.text_input(
         "SerpApi Key", type="password",
-        value=st.session_state.get("serpapi_key", ""),
+        value=st.session_state.get("serpapi_key", os.getenv("SERPAPI_KEY", "")),
         help="Get your free key at serpapi.com",
     )
     if serpapi_key:
         st.session_state["serpapi_key"] = serpapi_key
 
+    _default_provider = os.getenv("LLM_PROVIDER", "openai")
     llm_provider = st.selectbox(
         "LLM Provider", ["openai", "anthropic"],
-        index=0,
+        index=1 if _default_provider == "anthropic" else 0,
     )
 
     if llm_provider == "openai":
         llm_key = st.text_input(
             "OpenAI API Key", type="password",
-            value=st.session_state.get("openai_key", ""),
+            value=st.session_state.get("openai_key", os.getenv("OPENAI_API_KEY", "")),
         )
         if llm_key:
             st.session_state["openai_key"] = llm_key
@@ -76,7 +82,7 @@ with st.sidebar:
     else:
         llm_key = st.text_input(
             "Anthropic API Key", type="password",
-            value=st.session_state.get("anthropic_key", ""),
+            value=st.session_state.get("anthropic_key", os.getenv("ANTHROPIC_API_KEY", "")),
         )
         if llm_key:
             st.session_state["anthropic_key"] = llm_key

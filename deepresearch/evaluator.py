@@ -14,14 +14,20 @@ research question and identify what's still missing.
 
 For each source, assign:
 - relevance_score (0.0-1.0): How directly relevant is this to the research question?
-- credibility: "high" (academic, government, established org), "medium" (reputable media, expert blogs),
+  A source that addresses ANY aspect of the question should score at least 0.4.
+  A source directly addressing a key aspect should score 0.7+.
+- credibility: "high" (academic, government, established org, major news), "medium" (reputable media, expert blogs, industry reports),
   "low" (forums, unknown sources, thin content)
 
-Then identify coverage gaps — aspects of the research question that haven't been
-adequately addressed by current sources.
+Then identify coverage gaps — specific aspects of the research question that haven't been
+adequately addressed by current sources. Be precise and actionable.
 
 Finally, give an overall quality_score (0.0-1.0) representing how well the current
-evidence base answers the original question.
+evidence base answers the original question. Guidelines:
+- 0.3 = only tangentially related sources found
+- 0.5 = some key aspects covered but major gaps remain
+- 0.7 = most aspects covered with credible sources, minor gaps
+- 0.85+ = comprehensive coverage with strong evidence
 
 Respond with ONLY valid JSON (no markdown fences):
 {

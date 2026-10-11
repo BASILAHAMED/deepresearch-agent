@@ -21,14 +21,12 @@ ENGINE_PARAMS = {
         "num": 10,
     },
     "google_news": {
-        "engine": "google",
-        "tbm": "nws",
-        "num": 10,
+        "engine": "google_news",
         "gl": "in",
+        "hl": "en",
     },
     "google_patents": {
         "engine": "google_patents",
-        "num": 10,
     },
     "google_trends": {
         "engine": "google_trends",
@@ -63,8 +61,10 @@ def _extract_sources(results: dict, engine: str, query: str) -> list[dict]:
             })
         return sources
 
-    # Standard organic results
+    # Standard organic results (+ news_results for google_news engine)
     organic = results.get("organic_results", [])
+    if engine == "google_news":
+        organic = results.get("news_results", organic)
     for r in organic:
         sources.append({
             "title": r.get("title", ""),
